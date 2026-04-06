@@ -23,56 +23,59 @@ MCP-Telecom bridges the gap between AI assistants and network infrastructure. It
 ## Features
 
 - **Multi-Vendor Support** — Nokia SR OS, Cisco IOS / IOS-XR / NX-OS, Juniper Junos, Arista EOS
-- **25+ Network Tools** — BGP, OSPF, MPLS, interfaces, alarms, NTP, ARP, MAC tables, and more
+- **40+ Network Tools** — BGP, OSPF, MPLS, interfaces, alarms, NTP, ARP, MAC tables, and more
 - **Vendor Abstraction** — Say `bgp_summary` and get the right command for any vendor
+- **NETCONF/YANG** — Structured data retrieval via NETCONF alongside traditional SSH CLI
+- **Streaming Telemetry** — gNMI-based telemetry subscriptions with in-memory cache
+- **Topology Discovery** — Auto-build network maps from LLDP/CDP data with path finding
 - **Safety First** — Only read-only commands allowed; destructive commands are blocked
 - **Audit Logging** — Every command execution recorded in structured JSONL format
 - **Config Backup & Diff** — Backup running configs and compare against previous versions
 - **Health Checks** — Test device reachability with response time measurement
-- **MCP Resources** — Device inventory and vendor info exposed as browseable resources
+- **MCP Resources** — Device inventory, topology, and telemetry as browseable resources
 - **Troubleshooting Prompts** — Built-in BGP, interface, and health audit workflows
 - **Nokia Service Tools** — VPRN, VPLS, and SAP inspection for Nokia SR OS
+- **PyPI Ready** — `pip install mcp-telecom` with optional extras for NETCONF and telemetry
 - **Docker Support** — Run containerized with docker-compose
-- **CI/CD** — GitHub Actions with multi-Python-version testing
+- **CI/CD** — GitHub Actions with multi-Python-version testing and PyPI publishing
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    AI Agent (Claude/GPT)                 │
-│                                                         │
-│  "Show me BGP neighbors on nokia-pe1 that are down"     │
-└─────────────────────┬───────────────────────────────────┘
-                      │  MCP Protocol (stdio)
-                      ▼
-┌─────────────────────────────────────────────────────────┐
-│                   MCP-Telecom Server                    │
-│                                                         │
-│  ┌─────────┐  ┌──────────┐  ┌─────────┐  ┌──────────┐  │
-│  │  Tools  │  │Resources │  │ Prompts │  │  Safety  │  │
-│  │ (25+)   │  │(inventory│  │(trouble-│  │(command  │  │
-│  │         │  │ vendors) │  │ shoot)  │  │ filter)  │  │
-│  └────┬────┘  └──────────┘  └─────────┘  └──────────┘  │
-│       │                                                 │
-│  ┌────▼─────────────────────────────────────────────┐   │
-│  │           Vendor Command Mappings                │   │
-│  │  Nokia ─── Cisco ─── Juniper ─── Arista          │   │
-│  └────┬─────────┬──────────┬───────────┬────────────┘   │
-│       │         │          │           │                 │
-│  ┌────▼─────────▼──────────▼───────────▼────────────┐   │
-│  │        Connection Manager (Netmiko/SSH)          │   │
-│  └──────────────────────┬───────────────────────────┘   │
-│                         │                               │
-│  ┌──────────────────────▼───────────────────────────┐   │
-│  │              Audit Logger (JSONL)                │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────┬───────────────────────────────┘
-                          │  SSH
-                          ▼
-┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
-│ Nokia    │  │ Cisco    │  │ Juniper  │  │ Arista   │
-│ SR OS    │  │ IOS-XR   │  │ Junos    │  │ EOS      │
-└──────────┘  └──────────┘  └──────────┘  └──────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                     AI Agent (Claude/GPT)                    │
+│                                                              │
+│  "Show me BGP neighbors on nokia-pe1 that are down"         │
+│  "Discover the network topology"                             │
+│  "Subscribe to interface telemetry on cisco-xr1"             │
+└──────────────────────┬───────────────────────────────────────┘
+                       │  MCP Protocol (stdio)
+                       ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    MCP-Telecom Server                        │
+│                                                              │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────┐  │
+│  │ 40+ Tools│ │Resources │ │ Prompts  │ │ Safety/Audit   │  │
+│  └────┬─────┘ └──────────┘ └──────────┘ └────────────────┘  │
+│       │                                                      │
+│  ┌────▼──────────────────────────────────────────────────┐   │
+│  │            Vendor Command Mappings (35+ ops)          │   │
+│  │   Nokia ── Cisco ── Juniper ── Arista ── NX-OS        │   │
+│  └────┬──────────┬──────────┬────────────────────────────┘   │
+│       │          │          │                                │
+│  ┌────▼────┐ ┌───▼────┐ ┌──▼──────────┐ ┌───────────────┐   │
+│  │  SSH    │ │NETCONF │ │  Streaming  │ │   Topology    │   │
+│  │(Netmiko)│ │(YANG)  │ │  Telemetry  │ │  Discovery    │   │
+│  │         │ │ncclient│ │   (gNMI)    │ │  (LLDP/CDP)   │   │
+│  └────┬────┘ └───┬────┘ └──┬──────────┘ └───────────────┘   │
+│       │          │         │                                 │
+└───────┼──────────┼─────────┼─────────────────────────────────┘
+        │          │         │
+        ▼          ▼         ▼
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│ Nokia    │ │ Cisco    │ │ Juniper  │ │ Arista   │
+│ SR OS    │ │ IOS-XR   │ │ Junos    │ │ EOS      │
+└──────────┘ └──────────┘ └──────────┘ └──────────┘
 ```
 
 ## Quick Start
@@ -86,15 +89,22 @@ MCP-Telecom bridges the gap between AI assistants and network infrastructure. It
 ### Installation
 
 ```bash
-# Clone the repository
+# Install from PyPI (when published)
+pip install mcp-telecom
+
+# With NETCONF support
+pip install mcp-telecom[netconf]
+
+# With streaming telemetry support
+pip install mcp-telecom[telemetry]
+
+# With everything
+pip install mcp-telecom[all]
+
+# Or from source
 git clone https://github.com/Avinash-Amudala/MCP-Telecom.git
 cd MCP-Telecom
-
-# Install with uv
-uv sync
-
-# Or install with pip
-pip install -e .
+uv sync       # or: pip install -e .
 ```
 
 ### Configure Your Devices
@@ -205,6 +215,36 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 | `get_audit_log` | View command execution history |
 | `show_nokia_services` | Nokia VPRN/VPLS/SAP services |
 
+### NETCONF / YANG
+
+| Tool | Description |
+|------|-------------|
+| `netconf_get_config` | Retrieve config via NETCONF (structured XML) |
+| `netconf_get_operational` | Get operational state via YANG models |
+| `netconf_capabilities` | List device YANG module support |
+
+### Streaming Telemetry (gNMI)
+
+| Tool | Description |
+|------|-------------|
+| `telemetry_subscribe` | Start gNMI telemetry subscription |
+| `telemetry_query` | Query latest collected telemetry data |
+| `telemetry_history` | Get time-series telemetry for trend analysis |
+| `telemetry_list_subscriptions` | List active telemetry subscriptions |
+| `telemetry_unsubscribe` | Stop a telemetry subscription |
+| `telemetry_list_paths` | Show available OpenConfig telemetry paths |
+
+### Topology Discovery
+
+| Tool | Description |
+|------|-------------|
+| `discover_topology` | Build network map from LLDP/CDP data |
+| `show_topology` | Display ASCII network diagram |
+| `show_topology_json` | Export topology as JSON |
+| `show_topology_mermaid` | Export topology as Mermaid diagram |
+| `find_path` | Shortest path between two devices (BFS) |
+| `show_device_neighbors` | List discovered neighbors for a device |
+
 ## Supported Platforms
 
 | Vendor | Device Types | Netmiko Type |
@@ -263,24 +303,30 @@ npx @modelcontextprotocol/inspector uv run mcp-telecom
 MCP-Telecom/
 ├── src/mcp_telecom/
 │   ├── __init__.py          # Package init
-│   ├── server.py            # MCP server (tools + resources + prompts)
-│   ├── connection.py        # Device connection manager
+│   ├── server.py            # MCP server (40+ tools, resources, prompts)
+│   ├── connection.py        # SSH connection manager (Netmiko)
 │   ├── models.py            # Pydantic data models
 │   ├── safety.py            # Command safety validation
-│   ├── audit.py             # Audit logging
+│   ├── audit.py             # Structured JSONL audit logging
+│   ├── topology.py          # LLDP/CDP topology discovery & path finding
 │   ├── vendors/
 │   │   ├── __init__.py
-│   │   └── mappings.py      # Vendor-specific command mappings
+│   │   └── mappings.py      # Vendor-specific command mappings (6 vendors)
+│   ├── transports/
+│   │   ├── __init__.py
+│   │   ├── netconf.py       # NETCONF/YANG transport (ncclient)
+│   │   └── telemetry.py     # gNMI streaming telemetry collector
 │   └── tools/
 │       ├── __init__.py
 │       ├── routing.py       # Routing protocol tools
 │       ├── interfaces.py    # Interface monitoring tools
 │       └── system.py        # System monitoring tools
-├── tests/                   # Comprehensive test suite
-├── examples/                # Usage examples and configs
-├── docs/                    # Documentation
-├── .github/workflows/       # CI/CD pipeline
-├── pyproject.toml           # Project configuration
+├── tests/                   # 118 tests
+├── examples/                # Usage examples and Claude Desktop config
+├── .github/workflows/
+│   ├── ci.yml               # CI pipeline (Python 3.10-3.12 + Docker)
+│   └── publish.yml          # PyPI publish on GitHub release
+├── pyproject.toml           # Project config with optional extras
 ├── Dockerfile               # Container support
 ├── docker-compose.yml       # Docker Compose config
 ├── devices.yaml.example     # Example device config
@@ -289,11 +335,12 @@ MCP-Telecom/
 
 ## Roadmap
 
+- [x] **NETCONF/YANG** — Structured data retrieval via NETCONF
+- [x] **Streaming telemetry** — gNMI-based real-time telemetry collection
+- [x] **Topology discovery** — Auto-build network maps from LLDP/CDP
+- [x] **PyPI publishing** — `pip install mcp-telecom`
 - [ ] **SNMP support** — Poll SNMP MIBs alongside SSH
-- [ ] **NETCONF/YANG** — gNMI and NETCONF transport support
 - [ ] **Connection pooling** — Persistent SSH sessions for faster queries
-- [ ] **Streaming telemetry** — Real-time gRPC telemetry ingestion
-- [ ] **Topology discovery** — Auto-build network topology from LLDP/CDP
 - [ ] **Config compliance** — Check configs against golden templates
 - [ ] **Multi-device queries** — Run commands across device groups simultaneously
 - [ ] **Web dashboard** — Real-time device status dashboard

@@ -881,6 +881,453 @@ Generate a comparison report highlighting:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+#  MCP TOOLS — NETCONF / YANG
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def netconf_get_config(device: str, source: str = "running") -> str:
+    """Retrieve device configuration via NETCONF (structured XML/YANG).
+
+    Uses NETCONF protocol instead of SSH CLI scraping. Returns structured
+    XML data. Requires ncclient: pip install mcp-telecom[netconf]
+
+    Args:
+        device: Name of the device as defined in devices.yaml
+        source: Config datastore — 'running', 'candidate', or 'startup'
+    """
+    try:
+        from mcp_telecom.transports.netconf import (
+            NetconfTransport,
+            xml_to_text,
+        )
+
+        config = device_manager.get_device(device)
+        nc = NetconfTransport(
+            host=config.host,
+            username=config.username,
+            password=config.password,
+            device_type=config.device_type.value,
+            timeout=config.timeout,
+        )
+        result = nc.get_config(source=source)
+        audit.log_command(
+            device, f"netconf:get-config:{source}",
+            "netconf_get_config", True, len(result),
+        )
+        return xml_to_text(result)
+    except ImportError:
+        return (
+            "NETCONF support not installed. "
+            "Run: pip install mcp-telecom[netconf]"
+        )
+    except Exception as e:
+        audit.log_command(
+            device, "", "netconf_get_config", False, error=str(e),
+        )
+        return f"Error: {e}"
+
+
+@mcp.tool()
+def netconf_get_operational(
+    device: str, operation: str
+) -> str:
+    """Retrieve operational state via NETCONF using YANG models.
+
+    Uses pre-defined YANG filters for common operations. Supported
+    operations: system_info, interfaces, bgp_summary, routing_table.
+
+    Args:
+        device: Name of the device as defined in devices.yaml
+        operation: YANG operation (e.g. 'system_info', 'interfaces')
+    """
+    try:
+        from mcp_telecom.transports.netconf import (
+            NetconfTransport,
+            xml_to_text,
+        )
+
+        config = device_manager.get_device(device)
+        nc = NetconfTransport(
+            host=config.host,
+            username=config.username,
+            password=config.password,
+            device_type=config.device_type.value,
+            timeout=config.timeout,
+        )
+        result = nc.get_yang_data(operation)
+        audit.log_command(
+            device, f"netconf:get:{operation}",
+            "netconf_get_operational", True, len(result),
+        )
+        return xml_to_text(result)
+    except ImportError:
+        return (
+            "NETCONF support not installed. "
+            "Run: pip install mcp-telecom[netconf]"
+        )
+    except Exception as e:
+        audit.log_command(
+            device, "", "netconf_get_operational", False, error=str(e),
+        )
+        return f"Error: {e}"
+
+
+@mcp.tool()
+def netconf_capabilities(device: str) -> str:
+    """List NETCONF/YANG capabilities advertised by a device.
+
+    Shows all YANG modules the device supports, useful for understanding
+    what structured data you can retrieve.
+
+    Args:
+        device: Name of the device as defined in devices.yaml
+    """
+    try:
+        from mcp_telecom.transports.netconf import NetconfTransport
+
+        config = device_manager.get_device(device)
+        nc = NetconfTransport(
+            host=config.host,
+            username=config.username,
+            password=config.password,
+            device_type=config.device_type.value,
+            timeout=config.timeout,
+        )
+        caps = nc.get_capabilities()
+        lines = [
+            f"NETCONF Capabilities for {device}:",
+            f"  Total: {len(caps)} YANG modules",
+            "-" * 60,
+        ]
+        for cap in sorted(caps):
+            lines.append(f"  {cap}")
+        return "\n".join(lines)
+    except ImportError:
+        return (
+            "NETCONF support not installed. "
+            "Run: pip install mcp-telecom[netconf]"
+        )
+    except Exception as e:
+        return f"Error: {e}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  MCP TOOLS — Streaming Telemetry (gNMI)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def telemetry_subscribe(
+    device: str,
+    paths: str = "interface_counters,bgp_peer_state,cpu_utilization",
+    interval_ms: int = 10000,
+) -> str:
+    """Start a gNMI streaming telemetry subscription for a device.
+
+    Subscribes to OpenConfig telemetry paths and caches the latest
+    values for querying. Use telemetry_query to read collected data.
+
+    Args:
+        device: Name of the device as defined in devices.yaml
+        paths: Comma-separated telemetry path names or OpenConfig paths
+        interval_ms: Collection interval in milliseconds (default: 10000)
+    """
+    from mcp_telecom.transports.telemetry import (
+        COMMON_TELEMETRY_PATHS,
+        TelemetrySubscription,
+        gnmi_collector,
+    )
+
+    resolved_paths = []
+    for p in paths.split(","):
+        p = p.strip()
+        resolved_paths.append(COMMON_TELEMETRY_PATHS.get(p, p))
+
+    sub = TelemetrySubscription(
+        device=device,
+        paths=resolved_paths,
+        mode="STREAM",
+        interval_ms=interval_ms,
+    )
+    result = gnmi_collector.subscribe(sub)
+    audit.log_command(
+        device, f"telemetry:subscribe:{paths}",
+        "telemetry_subscribe", True, len(result),
+    )
+    return result
+
+
+@mcp.tool()
+def telemetry_query(device: str) -> str:
+    """Query the latest telemetry data collected for a device.
+
+    Returns the most recent values for all subscribed telemetry paths.
+    Start a subscription first with telemetry_subscribe.
+
+    Args:
+        device: Name of the device as defined in devices.yaml
+    """
+    from mcp_telecom.transports.telemetry import telemetry_store
+
+    return telemetry_store.format_for_display(device)
+
+
+@mcp.tool()
+def telemetry_history(
+    device: str, path: str, count: int = 20
+) -> str:
+    """Get historical telemetry values for trend analysis.
+
+    Returns time-series data for a specific telemetry path on a device.
+
+    Args:
+        device: Name of the device as defined in devices.yaml
+        path: Telemetry path name (e.g. 'interface_counters')
+        count: Number of historical data points (default: 20)
+    """
+    from mcp_telecom.transports.telemetry import (
+        COMMON_TELEMETRY_PATHS,
+        telemetry_store,
+    )
+
+    resolved = COMMON_TELEMETRY_PATHS.get(path, path)
+    history = telemetry_store.get_history(device, resolved, count)
+    if not history:
+        return f"No telemetry history for {device} path '{path}'."
+
+    lines = [f"Telemetry History: {device} / {path}", "-" * 50]
+    for entry in history:
+        ts = entry.timestamp.strftime("%H:%M:%S")
+        lines.append(f"  [{ts}] {entry.value}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def telemetry_list_subscriptions() -> str:
+    """List all active telemetry subscriptions."""
+    from mcp_telecom.transports.telemetry import gnmi_collector
+
+    subs = gnmi_collector.list_subscriptions()
+    if not subs:
+        return "No active telemetry subscriptions."
+
+    lines = ["Active Telemetry Subscriptions:", "=" * 60]
+    for s in subs:
+        status = "ACTIVE" if s["active"] else "STOPPED"
+        lines.append(
+            f"  {s['device']:20s} {status:8s} "
+            f"{len(s['paths'])} paths, {s['interval_ms']}ms"
+        )
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def telemetry_unsubscribe(device: str) -> str:
+    """Stop a telemetry subscription for a device.
+
+    Args:
+        device: Name of the device to stop collecting from
+    """
+    from mcp_telecom.transports.telemetry import gnmi_collector
+
+    return gnmi_collector.unsubscribe(device)
+
+
+@mcp.tool()
+def telemetry_list_paths() -> str:
+    """List all pre-defined telemetry path shortcuts.
+
+    Shows the available shortcut names and their corresponding
+    OpenConfig YANG paths for use with telemetry_subscribe.
+    """
+    from mcp_telecom.transports.telemetry import COMMON_TELEMETRY_PATHS
+
+    lines = [
+        "Available Telemetry Paths:",
+        "=" * 70,
+    ]
+    for name, path in sorted(COMMON_TELEMETRY_PATHS.items()):
+        lines.append(f"  {name:30s} {path}")
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  MCP TOOLS — Topology Discovery
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def discover_topology(devices: str = "") -> str:
+    """Discover network topology by collecting LLDP data from all devices.
+
+    Connects to each configured device (or specified subset), collects
+    LLDP neighbor information, and builds a topology map showing how
+    devices are interconnected.
+
+    Args:
+        devices: Comma-separated device names. Empty = all devices.
+    """
+    from mcp_telecom.topology import (
+        TopoNode,
+        parse_lldp_output,
+        topology_db,
+    )
+
+    device_list = device_manager.list_devices()
+    if devices:
+        names = {d.strip() for d in devices.split(",")}
+        device_list = [d for d in device_list if d.name in names]
+
+    if not device_list:
+        return "No devices to discover. Check devices.yaml."
+
+    results = []
+    for dev in device_list:
+        topology_db.add_node(TopoNode(
+            name=dev.name, host=dev.host, vendor=dev.vendor.value,
+        ))
+
+        try:
+            config = device_manager.get_device(dev.name)
+            cmd = get_command(config.device_type, "lldp_neighbors")
+            with device_manager.connect(dev.name) as conn:
+                output = conn.send_command(cmd)
+
+            links = parse_lldp_output(
+                dev.name, output, config.device_type.value,
+            )
+            for link in links:
+                topology_db.add_link(link)
+
+            results.append(
+                f"  {dev.name}: discovered {len(links)} neighbors"
+            )
+            audit.log_command(
+                dev.name, cmd, "discover_topology", True, len(output),
+            )
+        except Exception as e:
+            results.append(f"  {dev.name}: error — {e}")
+            audit.log_command(
+                dev.name, "", "discover_topology", False, error=str(e),
+            )
+
+    header = "Topology Discovery Results:\n" + "\n".join(results)
+    return header + "\n\n" + topology_db.to_ascii()
+
+
+@mcp.tool()
+def show_topology() -> str:
+    """Show the discovered network topology as an ASCII diagram.
+
+    Displays all discovered devices and their interconnections.
+    Run discover_topology first to collect data.
+    """
+    from mcp_telecom.topology import topology_db
+    return topology_db.to_ascii()
+
+
+@mcp.tool()
+def show_topology_json() -> str:
+    """Export the network topology as JSON.
+
+    Returns the topology in structured JSON format for programmatic
+    use or integration with visualization tools.
+    """
+    from mcp_telecom.topology import topology_db
+    return topology_db.to_json()
+
+
+@mcp.tool()
+def show_topology_mermaid() -> str:
+    """Export the network topology as a Mermaid diagram.
+
+    Returns Mermaid-formatted graph that can be rendered in Markdown,
+    GitHub, or documentation tools.
+    """
+    from mcp_telecom.topology import topology_db
+    return topology_db.to_mermaid()
+
+
+@mcp.tool()
+def find_path(source: str, target: str) -> str:
+    """Find the shortest path between two devices in the topology.
+
+    Uses BFS on the LLDP-discovered topology to find the shortest
+    path between two network devices.
+
+    Args:
+        source: Source device name
+        target: Target device name
+    """
+    from mcp_telecom.topology import topology_db
+
+    path = topology_db.find_path(source, target)
+    if path is None:
+        return (
+            f"No path found between '{source}' and '{target}'. "
+            "Ensure topology has been discovered with discover_topology."
+        )
+    return " → ".join(path) + f"  ({len(path) - 1} hops)"
+
+
+@mcp.tool()
+def show_device_neighbors(device: str) -> str:
+    """Show all discovered neighbors for a specific device.
+
+    Lists every direct connection found via LLDP/CDP for the device.
+
+    Args:
+        device: Name of the device
+    """
+    from mcp_telecom.topology import topology_db
+
+    links = topology_db.get_neighbors(device)
+    if not links:
+        return (
+            f"No neighbors discovered for '{device}'. "
+            "Run discover_topology first."
+        )
+
+    lines = [
+        f"Neighbors of {device} ({len(links)} links):",
+        "-" * 50,
+    ]
+    for link in links:
+        if link.local_device == device:
+            lines.append(
+                f"  {link.local_port:20s} ↔ "
+                f"{link.remote_device} ({link.remote_port})"
+            )
+        else:
+            lines.append(
+                f"  {link.remote_port:20s} ↔ "
+                f"{link.local_device} ({link.local_port})"
+            )
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Additional MCP Resources for new features
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@mcp.resource("telecom://topology")
+def resource_topology() -> str:
+    """Current network topology in JSON format."""
+    from mcp_telecom.topology import topology_db
+    return topology_db.to_json()
+
+
+@mcp.resource("telecom://telemetry/{device_name}")
+def resource_telemetry(device_name: str) -> str:
+    """Latest telemetry data for a device."""
+    from mcp_telecom.transports.telemetry import telemetry_store
+    summary = telemetry_store.get_summary(device_name)
+    return json.dumps(summary, indent=2, default=str)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 #  Server Entry Point
 # ═══════════════════════════════════════════════════════════════════════════
 

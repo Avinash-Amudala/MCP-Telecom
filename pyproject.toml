@@ -43,6 +43,11 @@ dependencies = [
     "python-dotenv>=1.0.0",
 ]
 
+[project.optional-dependencies]
+netconf = ["ncclient>=0.6.15"]
+telemetry = ["grpcio>=1.60.0", "protobuf>=4.25.0"]
+all = ["ncclient>=0.6.15", "grpcio>=1.60.0", "protobuf>=4.25.0"]
+
 [project.urls]
 Homepage = "https://github.com/Avinash-Amudala/MCP-Telecom"
 Repository = "https://github.com/Avinash-Amudala/MCP-Telecom"
