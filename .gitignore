@@ -24,6 +24,7 @@ ENV/
 .env
 *.env.local
 devices.yaml
+PROJECT_REFERENCE.md
 
 # OS
 .DS_Store
