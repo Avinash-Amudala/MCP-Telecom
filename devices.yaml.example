@@ -1,0 +1,61 @@
+# MCP-Telecom Device Configuration
+# Copy this file to devices.yaml and update with your actual device details.
+# WARNING: devices.yaml contains credentials and is excluded from git.
+
+# ── Nokia SR OS ─────────────────────────────────────────────────────────────
+nokia-pe1:
+  device_type: nokia_sros
+  host: 192.168.1.1
+  username: admin
+  password: admin
+  port: 22
+  timeout: 30
+
+nokia-pe2:
+  device_type: nokia_sros
+  host: 192.168.1.2
+  username: admin
+  password: admin
+  port: 22
+
+# ── Cisco IOS-XR ────────────────────────────────────────────────────────────
+cisco-xr1:
+  device_type: cisco_xr
+  host: 192.168.2.1
+  username: admin
+  password: cisco123
+  port: 22
+  timeout: 30
+
+# ── Cisco IOS ────────────────────────────────────────────────────────────────
+cisco-sw1:
+  device_type: cisco_ios
+  host: 192.168.2.10
+  username: admin
+  password: cisco123
+  port: 22
+  secret: enable_secret
+
+# ── Cisco NX-OS ──────────────────────────────────────────────────────────────
+cisco-nx1:
+  device_type: cisco_nxos
+  host: 192.168.2.20
+  username: admin
+  password: cisco123
+  port: 22
+
+# ── Juniper Junos ───────────────────────────────────────────────────────────
+juniper-mx1:
+  device_type: juniper_junos
+  host: 192.168.3.1
+  username: admin
+  password: Juniper123
+  port: 22
+
+# ── Arista EOS ──────────────────────────────────────────────────────────────
+arista-sw1:
+  device_type: arista_eos
+  host: 192.168.4.1
+  username: admin
+  password: arista123
+  port: 22
