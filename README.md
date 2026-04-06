@@ -110,21 +110,21 @@ Edit `devices.yaml` with your actual device credentials:
 nokia-pe1:
   device_type: nokia_sros
   host: 192.168.1.1
-  username: admin
-  password: your_password
+  username: your_username
+  password: "${NOKIA_PASSWORD}"   # replace with real creds
   port: 22
 
 cisco-xr1:
   device_type: cisco_xr
   host: 192.168.2.1
-  username: admin
-  password: your_password
+  username: your_username
+  password: "${CISCO_PASSWORD}"
 
 juniper-mx1:
   device_type: juniper_junos
   host: 192.168.3.1
-  username: admin
-  password: your_password
+  username: your_username
+  password: "${JUNIPER_PASSWORD}"
 ```
 
 ### Test with MCP Inspector

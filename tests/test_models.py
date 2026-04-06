@@ -31,7 +31,7 @@ class TestDeviceConfig:
             device_type=VendorType.NOKIA_SROS,
             host="192.168.1.1",
             username="admin",
-            password="secret",
+            password="testpass",  # noqa: S106
         )
         assert config.host == "192.168.1.1"
         assert config.port == 22
@@ -42,7 +42,7 @@ class TestDeviceConfig:
             device_type=VendorType.CISCO_IOS,
             host="10.0.0.1",
             username="admin",
-            password="pass",
+            password="testpass",  # noqa: S106
             port=2222,
         )
         assert config.port == 2222
@@ -52,9 +52,9 @@ class TestDeviceConfig:
             device_type=VendorType.NOKIA_SROS,
             host="192.168.1.1",
             username="admin",
-            password="supersecret",
+            password="testpass_hidden",  # noqa: S106
         )
-        assert "supersecret" not in repr(config)
+        assert "testpass_hidden" not in repr(config)
 
 
 class TestCommandResult:

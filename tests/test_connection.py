@@ -19,8 +19,8 @@ class TestDeviceManager:
         config = DeviceConfig(
             device_type=VendorType.NOKIA_SROS,
             host="192.168.1.1",
-            username="admin",
-            password="admin",
+            username="testuser",
+            password="testpass",  # noqa: S106
         )
         dm.add_device("test-router", config)
         devices = dm.list_devices()
@@ -32,8 +32,8 @@ class TestDeviceManager:
         config = DeviceConfig(
             device_type=VendorType.NOKIA_SROS,
             host="192.168.1.1",
-            username="admin",
-            password="admin",
+            username="testuser",
+            password="testpass",  # noqa: S106
         )
         dm.add_device("test-router", config)
         assert dm.remove_device("test-router") is True
@@ -48,8 +48,8 @@ class TestDeviceManager:
         config = DeviceConfig(
             device_type=VendorType.CISCO_IOS,
             host="10.0.0.1",
-            username="admin",
-            password="cisco",
+            username="testuser",
+            password="testpass",  # noqa: S106
         )
         dm.add_device("switch1", config)
         retrieved = dm.get_device("switch1")
@@ -65,14 +65,14 @@ class TestDeviceManager:
 router1:
   device_type: nokia_sros
   host: 192.168.1.1
-  username: admin
-  password: admin
+  username: testuser
+  password: testpass
   port: 22
 router2:
   device_type: cisco_ios
   host: 192.168.2.1
-  username: admin
-  password: cisco
+  username: testuser
+  password: testpass
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
@@ -101,8 +101,8 @@ router2:
                 DeviceConfig(
                     device_type=VendorType.NOKIA_SROS,
                     host="1.1.1.1",
-                    username="a",
-                    password="b",
+                    username="testuser",
+                    password="testpass",  # noqa: S106
                 ),
             )
         names = [d.name for d in dm.list_devices()]

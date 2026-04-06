@@ -1,29 +1,30 @@
 # MCP-Telecom Device Configuration
 # Copy this file to devices.yaml and update with your actual device details.
 # WARNING: devices.yaml contains credentials and is excluded from git.
+# NEVER commit real credentials to version control.
 
 # ── Nokia SR OS ─────────────────────────────────────────────────────────────
 nokia-pe1:
   device_type: nokia_sros
   host: 192.168.1.1
-  username: admin
-  password: admin
+  username: your_username
+  password: "${NOKIA_PASSWORD}"       # replace or use env var
   port: 22
   timeout: 30
 
 nokia-pe2:
   device_type: nokia_sros
   host: 192.168.1.2
-  username: admin
-  password: admin
+  username: your_username
+  password: "${NOKIA_PASSWORD}"
   port: 22
 
 # ── Cisco IOS-XR ────────────────────────────────────────────────────────────
 cisco-xr1:
   device_type: cisco_xr
   host: 192.168.2.1
-  username: admin
-  password: cisco123
+  username: your_username
+  password: "${CISCO_PASSWORD}"
   port: 22
   timeout: 30
 
@@ -31,31 +32,31 @@ cisco-xr1:
 cisco-sw1:
   device_type: cisco_ios
   host: 192.168.2.10
-  username: admin
-  password: cisco123
+  username: your_username
+  password: "${CISCO_PASSWORD}"
   port: 22
-  secret: enable_secret
+  secret: "${ENABLE_SECRET}"
 
 # ── Cisco NX-OS ──────────────────────────────────────────────────────────────
 cisco-nx1:
   device_type: cisco_nxos
   host: 192.168.2.20
-  username: admin
-  password: cisco123
+  username: your_username
+  password: "${CISCO_PASSWORD}"
   port: 22
 
 # ── Juniper Junos ───────────────────────────────────────────────────────────
 juniper-mx1:
   device_type: juniper_junos
   host: 192.168.3.1
-  username: admin
-  password: Juniper123
+  username: your_username
+  password: "${JUNIPER_PASSWORD}"
   port: 22
 
 # ── Arista EOS ──────────────────────────────────────────────────────────────
 arista-sw1:
   device_type: arista_eos
   host: 192.168.4.1
-  username: admin
-  password: arista123
+  username: your_username
+  password: "${ARISTA_PASSWORD}"
   port: 22
