@@ -1,6 +1,6 @@
 [project]
 name = "mcp-telecom"
-version = "0.1.0"
+version = "0.2.0"
 description = "The first MCP server for network equipment — let AI agents talk to Nokia SR OS, Cisco IOS-XR, and Juniper Junos routers"
 readme = "README.md"
 license = { text = "MIT" }
@@ -46,7 +46,18 @@ dependencies = [
 [project.optional-dependencies]
 netconf = ["ncclient>=0.6.15"]
 telemetry = ["grpcio>=1.60.0", "protobuf>=4.25.0"]
-all = ["ncclient>=0.6.15", "grpcio>=1.60.0", "protobuf>=4.25.0"]
+snmp = ["pysnmp>=7.0.0"]
+dashboard = ["fastapi>=0.110.0", "uvicorn>=0.27.0"]
+metrics = ["prometheus_client>=0.20.0"]
+all = [
+    "ncclient>=0.6.15",
+    "grpcio>=1.60.0",
+    "protobuf>=4.25.0",
+    "pysnmp>=7.0.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.27.0",
+    "prometheus_client>=0.20.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/Avinash-Amudala/MCP-Telecom"

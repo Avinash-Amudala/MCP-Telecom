@@ -1307,7 +1307,487 @@ def show_device_neighbors(device: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  Additional MCP Resources for new features
+#  MCP TOOLS — SNMP MIB Polling
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def snmp_get(
+    device: str,
+    oids: str = "sysDescr,sysUpTime,sysName",
+    community: str = "public",
+) -> str:
+    """Poll SNMP OIDs from a network device.
+
+    Retrieves specific SNMP MIB values. Accepts OID names or dotted
+    notation. Requires pysnmp: pip install mcp-telecom[snmp]
+
+    Args:
+        device: Name of the device as defined in devices.yaml
+        oids: Comma-separated OID names or numbers
+        community: SNMPv2c community string (default: public)
+    """
+    try:
+        from mcp_telecom.transports.snmp import (
+            SnmpPoller,
+            format_snmp_results,
+        )
+
+        config = device_manager.get_device(device)
+        poller = SnmpPoller(host=config.host, community=community)
+        oid_list = [o.strip() for o in oids.split(",")]
+        results = poller.get(oid_list)
+        audit.log_command(
+            device, f"snmp:get:{oids}", "snmp_get", True, len(results),
+        )
+        return format_snmp_results(results)
+    except ImportError:
+        return "SNMP support not installed. Run: pip install mcp-telecom[snmp]"
+    except Exception as e:
+        audit.log_command(device, "", "snmp_get", False, error=str(e))
+        return f"Error: {e}"
+
+
+@mcp.tool()
+def snmp_walk(
+    device: str,
+    base_oid: str = "1.3.6.1.2.1.2.2.1",
+    community: str = "public",
+) -> str:
+    """Walk an SNMP MIB subtree on a network device.
+
+    Retrieves all OIDs under the specified base OID. Useful for
+    interface tables, routing tables, etc.
+
+    Args:
+        device: Name of the device as defined in devices.yaml
+        base_oid: Base OID to walk (default: IF-MIB ifTable)
+        community: SNMPv2c community string
+    """
+    try:
+        from mcp_telecom.transports.snmp import (
+            SnmpPoller,
+            format_snmp_results,
+        )
+
+        config = device_manager.get_device(device)
+        poller = SnmpPoller(host=config.host, community=community)
+        results = poller.walk(base_oid)
+        audit.log_command(
+            device, f"snmp:walk:{base_oid}", "snmp_walk", True, len(results),
+        )
+        return format_snmp_results(results)
+    except ImportError:
+        return "SNMP support not installed. Run: pip install mcp-telecom[snmp]"
+    except Exception as e:
+        audit.log_command(device, "", "snmp_walk", False, error=str(e))
+        return f"Error: {e}"
+
+
+@mcp.tool()
+def snmp_device_overview(
+    device: str, community: str = "public"
+) -> str:
+    """Get a quick SNMP-based overview of a device.
+
+    Polls system MIB, interface counts, and uptime in a single request.
+
+    Args:
+        device: Name of the device as defined in devices.yaml
+        community: SNMPv2c community string
+    """
+    try:
+        from mcp_telecom.transports.snmp import (
+            SYS_CONTACT,
+            SYS_DESCR,
+            SYS_LOCATION,
+            SYS_NAME,
+            SYS_UPTIME,
+            SnmpPoller,
+            format_snmp_results,
+        )
+
+        config = device_manager.get_device(device)
+        poller = SnmpPoller(host=config.host, community=community)
+        results = poller.get([
+            SYS_DESCR, SYS_UPTIME, SYS_NAME, SYS_LOCATION, SYS_CONTACT,
+        ])
+        audit.log_command(
+            device, "snmp:device_overview",
+            "snmp_device_overview", True, len(results),
+        )
+        return format_snmp_results(results)
+    except ImportError:
+        return "SNMP support not installed. Run: pip install mcp-telecom[snmp]"
+    except Exception as e:
+        audit.log_command(device, "", "snmp_device_overview", False, error=str(e))
+        return f"Error: {e}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  MCP TOOLS — Multi-Device Parallel Queries
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def parallel_command(
+    command: str, devices: str = "", max_workers: int = 10
+) -> str:
+    """Run a read-only command on multiple devices simultaneously.
+
+    Executes the same CLI command across all (or specified) devices in
+    parallel using a thread pool. Much faster than querying one-by-one.
+
+    Args:
+        command: CLI command to run (must be read-only)
+        devices: Comma-separated device names. Empty = all devices.
+        max_workers: Max concurrent threads (default: 10)
+    """
+    from mcp_telecom.parallel import ParallelExecutor, format_parallel_results
+
+    executor = ParallelExecutor(device_manager)
+    device_list = (
+        [d.strip() for d in devices.split(",") if d.strip()] if devices else None
+    )
+    results = executor.run_on_all(command, device_list, max_workers)
+    audit.log_command(
+        "ALL", command, "parallel_command", True, len(results),
+    )
+    return format_parallel_results(results)
+
+
+@mcp.tool()
+def parallel_operation(
+    operation: str, devices: str = "", max_workers: int = 10
+) -> str:
+    """Run a vendor-mapped operation on multiple devices simultaneously.
+
+    Translates the operation name to the correct vendor CLI command for
+    each device and runs them all in parallel.
+
+    Args:
+        operation: Operation name (e.g. 'bgp_summary', 'interfaces')
+        devices: Comma-separated device names. Empty = all devices.
+        max_workers: Max concurrent threads (default: 10)
+    """
+    from mcp_telecom.parallel import ParallelExecutor, format_parallel_results
+
+    executor = ParallelExecutor(device_manager)
+    device_list = (
+        [d.strip() for d in devices.split(",") if d.strip()] if devices else None
+    )
+    results = executor.run_operation_on_all(operation, device_list, max_workers)
+    audit.log_command(
+        "ALL", f"op:{operation}", "parallel_operation", True, len(results),
+    )
+    return format_parallel_results(results)
+
+
+@mcp.tool()
+def compare_devices(
+    operation: str, devices: str = ""
+) -> str:
+    """Compare command output across multiple devices.
+
+    Runs the same operation on multiple devices and highlights differences.
+    Useful for finding configuration drift or inconsistencies.
+
+    Args:
+        operation: Operation name (e.g. 'system_info', 'ntp_status')
+        devices: Comma-separated device names. Empty = all devices.
+    """
+    from mcp_telecom.parallel import ParallelExecutor
+
+    executor = ParallelExecutor(device_manager)
+    device_list = (
+        [d.strip() for d in devices.split(",") if d.strip()] if devices else None
+    )
+    return executor.compare_across_devices(operation, device_list)
+
+
+@mcp.tool()
+def parallel_health_check(devices: str = "") -> str:
+    """Health-check multiple devices in parallel.
+
+    Tests SSH reachability and response time for all specified devices
+    simultaneously. Much faster than sequential health checks.
+
+    Args:
+        devices: Comma-separated device names. Empty = all devices.
+    """
+    from mcp_telecom.parallel import ParallelExecutor
+
+    executor = ParallelExecutor(device_manager)
+    device_list = (
+        [d.strip() for d in devices.split(",") if d.strip()] if devices else None
+    )
+    return executor.batch_health_check(device_list)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  MCP TOOLS — Config Compliance
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def compliance_check(device: str) -> str:
+    """Check a device's running config against security best practices.
+
+    Evaluates the running configuration against 20+ compliance rules
+    covering NTP, SSH, SNMP, AAA, passwords, and more. Returns a
+    scored report with pass/fail per rule and remediation advice.
+
+    Args:
+        device: Name of the device as defined in devices.yaml
+    """
+    try:
+        from mcp_telecom.compliance import DEFAULT_RULES, ComplianceChecker
+
+        config = device_manager.get_device(device)
+        cmd = get_command(config.device_type, "config_running")
+        with device_manager.connect(device) as conn:
+            running_config = conn.send_command(cmd, read_timeout=60)
+
+        checker = ComplianceChecker()
+        checker.load_rules_from_dict([r.model_dump() for r in DEFAULT_RULES])
+        results = checker.check_config(
+            device, running_config, config.device_type.value,
+        )
+        report = checker.generate_report(results)
+        score = checker.get_score(results)
+        audit.log_command(
+            device, "compliance_check", "compliance_check",
+            True, len(report),
+        )
+        return f"Compliance Score: {score:.0%}\n\n{report}"
+    except Exception as e:
+        audit.log_command(device, "", "compliance_check", False, error=str(e))
+        return f"Error: {e}"
+
+
+@mcp.tool()
+def compliance_check_rule(
+    device: str, rule_name: str
+) -> str:
+    """Check a specific compliance rule against a device.
+
+    Args:
+        device: Name of the device as defined in devices.yaml
+        rule_name: Name of the compliance rule to check
+    """
+    try:
+        from mcp_telecom.compliance import DEFAULT_RULES, ComplianceChecker
+
+        config = device_manager.get_device(device)
+        cmd = get_command(config.device_type, "config_running")
+        with device_manager.connect(device) as conn:
+            running_config = conn.send_command(cmd, read_timeout=60)
+
+        matching = [r for r in DEFAULT_RULES if r.name == rule_name]
+        if not matching:
+            names = ", ".join(r.name for r in DEFAULT_RULES)
+            return f"Unknown rule: '{rule_name}'. Available: {names}"
+
+        checker = ComplianceChecker()
+        checker.load_rules_from_dict([r.model_dump() for r in matching])
+        results = checker.check_config(
+            device, running_config, config.device_type.value,
+        )
+        return checker.generate_report(results)
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool()
+def compliance_list_rules() -> str:
+    """List all available compliance rules and their descriptions."""
+    from mcp_telecom.compliance import DEFAULT_RULES
+
+    lines = ["Compliance Rules:", "=" * 70]
+    for rule in DEFAULT_RULES:
+        vendor = rule.vendor or "all"
+        lines.append(
+            f"  [{rule.severity:8s}] {rule.name:30s} "
+            f"({vendor}) — {rule.description}"
+        )
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  MCP TOOLS — Connection Pool Management
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def pool_stats() -> str:
+    """Show connection pool statistics.
+
+    Returns counts of active, idle, and total persistent SSH connections
+    per device. Useful for monitoring connection reuse.
+    """
+    from mcp_telecom.pool import ConnectionPool
+
+    pool = ConnectionPool()
+    stats = pool.get_stats()
+    lines = [
+        "Connection Pool Stats:",
+        f"  Total connections: {stats['total_connections']}",
+        "-" * 50,
+    ]
+    for dev, info in stats.get("devices", {}).items():
+        lines.append(
+            f"  {dev:20s}  active={info['active']}  "
+            f"idle={info['idle']}  total={info['total']}"
+        )
+    if not stats.get("devices"):
+        lines.append("  No active connections in pool.")
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  MCP TOOLS — Containerlab Integration
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def clab_generate(
+    scenario: str = "basic",
+) -> str:
+    """Generate a Containerlab topology for lab testing.
+
+    Creates a containerlab YAML topology file that mirrors your production
+    device inventory, or uses a pre-built test scenario.
+
+    Args:
+        scenario: Test scenario — 'basic', 'mpls_core', 'datacenter',
+            'isp_edge', or 'inventory' (uses your devices.yaml)
+    """
+    from mcp_telecom.containerlab import ContainerlabManager
+
+    clab = ContainerlabManager()
+
+    if scenario == "inventory":
+        devices = device_manager.list_devices()
+        content = clab.generate_topology(devices)
+    else:
+        content = clab.generate_test_scenario(scenario)
+
+    path = clab.save_topology(content)
+    commands = clab.get_deploy_commands(path)
+
+    return f"Generated topology: {path}\n\n{content}\n\nDeploy commands:\n{commands}"
+
+
+@mcp.tool()
+def clab_devices_yaml(
+    scenario: str = "basic",
+) -> str:
+    """Generate a devices.yaml for a Containerlab lab.
+
+    Creates a MCP-Telecom devices.yaml that connects to the management
+    IPs of a containerlab deployment, so you can instantly start using
+    MCP-Telecom against your lab.
+
+    Args:
+        scenario: Which lab scenario to generate for
+    """
+    import yaml as _yaml
+
+    from mcp_telecom.containerlab import ContainerlabManager
+
+    clab = ContainerlabManager()
+    topo_content = clab.generate_test_scenario(scenario)
+    topo_data = _yaml.safe_load(topo_content)
+    devices_yaml = clab.generate_devices_yaml("mcp-telecom", topo_data)
+    return f"devices.yaml for '{scenario}' lab:\n\n{devices_yaml}"
+
+
+@mcp.tool()
+def clab_scenarios() -> str:
+    """List available Containerlab test scenarios.
+
+    Shows pre-built lab topologies you can deploy for testing
+    MCP-Telecom without production network access.
+    """
+    scenarios = {
+        "basic": "3-router triangle (Nokia SR Linux)",
+        "mpls_core": "MPLS PE-P-PE with Nokia + Cisco XR",
+        "datacenter": "Spine-leaf with Arista + Cisco NX-OS",
+        "isp_edge": "Internet edge with BGP peering (multi-vendor)",
+        "inventory": "Mirror your current devices.yaml inventory",
+    }
+    lines = ["Containerlab Scenarios:", "=" * 60]
+    for name, desc in scenarios.items():
+        lines.append(f"  {name:15s} — {desc}")
+    lines.append("\nUse clab_generate(scenario='...') to create a topology.")
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  MCP TOOLS — Dashboard & Metrics
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def start_dashboard(port: int = 8080) -> str:
+    """Get instructions to start the web dashboard.
+
+    The dashboard provides a real-time view of all device statuses with
+    auto-refreshing device cards. Requires: pip install mcp-telecom[dashboard]
+
+    Args:
+        port: HTTP port for the dashboard (default: 8080)
+    """
+    return (
+        f"To start the MCP-Telecom web dashboard:\n\n"
+        f"  pip install fastapi uvicorn\n"
+        f"  python -c \"\n"
+        f"from mcp_telecom.dashboard import DashboardApp\n"
+        f"from mcp_telecom.connection import DeviceManager\n"
+        f"dm = DeviceManager('devices.yaml')\n"
+        f"app = DashboardApp(dm)\n"
+        f"app.start(port={port})\n"
+        f"\"\n\n"
+        f"Then open http://localhost:{port} in your browser.\n"
+        f"The dashboard shows device status cards with auto-refresh."
+    )
+
+
+@mcp.tool()
+def start_metrics_endpoint(port: int = 9090) -> str:
+    """Get instructions to start the Prometheus metrics exporter.
+
+    Exposes /metrics endpoint for Grafana dashboards. Tracks device
+    reachability, command execution counts, and compliance scores.
+    Requires: pip install mcp-telecom[metrics]
+
+    Args:
+        port: HTTP port for Prometheus metrics (default: 9090)
+    """
+    return (
+        f"To start the Prometheus metrics exporter:\n\n"
+        f"  pip install prometheus_client\n"
+        f"  python -c \"\n"
+        f"from mcp_telecom.metrics import metrics_exporter\n"
+        f"metrics_exporter.start_http_server(port={port})\n"
+        f"\"\n\n"
+        f"Then add to your Prometheus config:\n"
+        f"  scrape_configs:\n"
+        f"    - job_name: mcp-telecom\n"
+        f"      static_configs:\n"
+        f"        - targets: ['localhost:{port}']\n\n"
+        f"Available metrics:\n"
+        f"  mcp_telecom_device_up\n"
+        f"  mcp_telecom_device_response_ms\n"
+        f"  mcp_telecom_commands_total\n"
+        f"  mcp_telecom_command_duration_seconds\n"
+        f"  mcp_telecom_devices_total\n"
+        f"  mcp_telecom_compliance_score"
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Additional MCP Resources
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -1326,13 +1806,28 @@ def resource_telemetry(device_name: str) -> str:
     return json.dumps(summary, indent=2, default=str)
 
 
+@mcp.resource("telecom://compliance-rules")
+def resource_compliance_rules() -> str:
+    """Available compliance rules in JSON format."""
+    from mcp_telecom.compliance import DEFAULT_RULES
+    return json.dumps([r.model_dump() for r in DEFAULT_RULES], indent=2)
+
+
+@mcp.resource("telecom://pool-stats")
+def resource_pool_stats() -> str:
+    """Connection pool statistics."""
+    from mcp_telecom.pool import ConnectionPool
+    pool = ConnectionPool()
+    return json.dumps(pool.get_stats(), indent=2)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  Server Entry Point
 # ═══════════════════════════════════════════════════════════════════════════
 
 def main():
     """Run the MCP-Telecom server."""
-    logger.info("Starting MCP-Telecom server v0.1.0")
+    logger.info("Starting MCP-Telecom server v0.2.0")
     logger.info("Loaded %d devices", len(device_manager.list_devices()))
     mcp.run(transport="stdio")
 
