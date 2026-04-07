@@ -6,6 +6,12 @@
 
 > _"Hey Claude, show me the BGP summary on nokia-pe1 and check if any peers are down."_
 
+<p align="center">
+  <img src="assets/demo.gif" alt="MCP-Telecom Demo — querying network devices through Claude" width="720">
+  <br>
+  <em>MCP-Telecom in action — asking Claude about network devices, tools, vendors, and telemetry paths</em>
+</p>
+
 MCP-Telecom bridges the gap between AI assistants and network infrastructure. It implements the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) to give AI agents like Claude and GPT secure, read-only access to your network devices via SSH — no custom scripts, no fragile automation, just natural language.
 
 ---
@@ -165,6 +171,14 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
   }
 }
 ```
+
+Once configured, the server appears in Claude Desktop under **Settings → Developer**:
+
+<p align="center">
+  <img src="assets/claude-desktop-mcp.png" alt="MCP-Telecom running in Claude Desktop" width="720">
+  <br>
+  <em>MCP-Telecom registered and running in Claude Desktop's Developer settings</em>
+</p>
 
 ## Available Tools
 
@@ -339,6 +353,8 @@ MCP-Telecom/
 - [x] **Streaming telemetry** — gNMI-based real-time telemetry collection
 - [x] **Topology discovery** — Auto-build network maps from LLDP/CDP
 - [x] **PyPI publishing** — `pip install mcp-telecom`
+- [ ] **MCP Registry listing** — Publish to the [official MCP Registry](https://modelcontextprotocol.io/registry)
+- [ ] **Remote MCP server** — HTTP/SSE transport for Claude's MCP Directory listing
 - [ ] **SNMP support** — Poll SNMP MIBs alongside SSH
 - [ ] **Connection pooling** — Persistent SSH sessions for faster queries
 - [ ] **Config compliance** — Check configs against golden templates

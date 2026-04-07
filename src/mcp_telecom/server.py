@@ -31,8 +31,7 @@ logger = logging.getLogger("mcp_telecom")
 
 mcp = FastMCP(
     "MCP-Telecom",
-    version="0.1.0",
-    description=(
+    instructions=(
         "The first MCP server for network equipment. "
         "Interact with Nokia SR OS, Cisco IOS-XR, Juniper Junos, "
         "Arista EOS, and Cisco NX-OS routers through AI agents."
